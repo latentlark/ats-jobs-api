@@ -1,17 +1,22 @@
 """Batch and concurrency checks. usage: python3 test/batch.py [base]"""
 import json, sys, time, urllib.request, urllib.error, concurrent.futures as cf
+UA = 'ats-jobs-api-test/1.0 (curl compatible)'
 BASE = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:8787'
 def post(body):
-    req = urllib.request.Request(BASE + '/jobs/batch', data=json.dumps(body).encode(), headers={'Content-Type': 'application/json'})
+    req = urllib.request.Request(BASE + '/jobs/batch', data=json.dumps(body).encode(), headers={'Content-Type': 'application/json', 'User-Agent': UA})
     t = time.time()
     try: r = urllib.request.urlopen(req, timeout=90); code, raw = r.status, r.read()
     except urllib.error.HTTPError as e: code, raw = e.code, e.read()
-    return code, round((time.time() - t) * 1000), len(raw), json.loads(raw)
+    try: d = json.loads(raw)
+    except Exception: d = {'_raw': raw[:300].decode(errors='replace')}
+    return code, round((time.time() - t) * 1000), len(raw), d
 def get(path):
     t = time.time()
-    try: r = urllib.request.urlopen(BASE + path, timeout=90); code, raw = r.status, r.read()
+    try: r = urllib.request.urlopen(urllib.request.Request(BASE + path, headers={'User-Agent': UA}), timeout=90); code, raw = r.status, r.read()
     except urllib.error.HTTPError as e: code, raw = e.code, e.read()
-    return code, round((time.time() - t) * 1000), len(raw), json.loads(raw)
+    try: d = json.loads(raw)
+    except Exception: d = {'_raw': raw[:300].decode(errors='replace')}
+    return code, round((time.time() - t) * 1000), len(raw), d
 
 companies = ['greenhouse:airbnb', 'greenhouse:cloudflare', 'greenhouse:datadog', 'greenhouse:gitlab', 'lever:spotify', 'lever:plaid',
              'ashby:notion', 'ashby:linear', 'ashby:cohere', 'smartrecruiters:Visa', 'workable:local-490', 'recruitee:careyn',

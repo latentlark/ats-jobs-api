@@ -1,17 +1,20 @@
 """Buyer-scale test against a running worker (wrangler dev). usage: python3 test/scale.py [base]"""
 import json, sys, time, urllib.request, urllib.error
+UA = 'ats-jobs-api-test/1.0 (curl compatible)'
 BASE = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:8787'
 REQ = ['id', 'title', 'company', 'ats', 'location', 'remote', 'department', 'employmentType', 'salary', 'postedAt', 'updatedAt', 'url', 'applyUrl']
 
 def call(path, body=None):
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(BASE + path, data=data, headers={'Content-Type': 'application/json'} if data else {})
+    req = urllib.request.Request(BASE + path, data=data, headers={'Content-Type': 'application/json', 'User-Agent': UA} if data else {'User-Agent': UA})
     t = time.time()
     try:
         r = urllib.request.urlopen(req, timeout=60); code = r.status; raw = r.read()
     except urllib.error.HTTPError as e:
         code = e.code; raw = e.read()
-    return code, (time.time() - t) * 1000, len(raw), json.loads(raw)
+    try: d = json.loads(raw)
+    except Exception: d = {'_raw': raw[:300].decode(errors='replace')}
+    return code, (time.time() - t) * 1000, len(raw), d
 
 def check_jobs(jobs, desc=True):
     ids = [j['id'] for j in jobs]
@@ -26,7 +29,7 @@ def check_jobs(jobs, desc=True):
 
 rows = []
 singles = [('greenhouse', 'stripe'), ('greenhouse', 'databricks'), ('lever', 'palantir'), ('ashby', 'openai'), ('ashby', 'ramp'),
-           ('smartrecruiters', 'BoschGroup'), ('workable', 'creativechaos'), ('workable', 'innovativ-pharma-inc'), ('recruitee', 'vdkgroep'), ('recruitee', 'duravermeer')]
+           ('smartrecruiters', 'BoschGroup'), ('recruitee', 'vdkgroep'), ('recruitee', 'duravermeer')]
 for ats, c in singles:
     for label, q in [('cold', f'/jobs?ats={ats}&company={c}&limit=500&description=text&descriptionMaxLength=1000'),
                      ('warm', f'/jobs?ats={ats}&company={c}&limit=500&description=text&descriptionMaxLength=1000')]:

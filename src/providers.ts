@@ -42,7 +42,9 @@ function dedupe(jobs: RawJob[]): RawJob[] {
 /** EU fallback hosts: short timeout, no retry, and a network failure counts as "not on this host". */
 async function fallbackGet(url: string, budget: Budget) {
   try {
-    return await upstreamGet(url, budget, { timeoutMs: 4000, retries: 0 });
+    const r = await upstreamGet(url, budget, { timeoutMs: 4000, retries: 0 });
+    // From Workers the Greenhouse EU host can answer 530 (origin unreachable): treat any non-200 as "not here".
+    return r.status === 200 ? r : { status: 404, body: '' };
   } catch (e) {
     if (e instanceof HttpError && (e.code === 'upstream_error' || e.code === 'upstream_timeout')) return { status: 404, body: '' };
     throw e;

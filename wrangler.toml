@@ -2,6 +2,7 @@ name = "ats-jobs-api"
 main = "src/index.ts"
 compatibility_date = "2025-10-01"
 workers_dev = true
+preview_urls = false
 
 # No secrets are required.
 # Optional: set PROXY_SECRET with `wrangler secret put PROXY_SECRET` to require the
@@ -11,3 +12,5 @@ workers_dev = true
 [vars]
 # Edge cache TTL in seconds for normalized board data.
 CACHE_TTL_SECONDS = "600"
+# Workable answers Cloudflare Workers traffic with error 1015 (rate limited), so it is off by default.
+ENABLE_WORKABLE = "false"

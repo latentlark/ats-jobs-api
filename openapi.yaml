@@ -4,7 +4,8 @@ info:
   version: 1.0.0
   description: |
     Open jobs from a company's own applicant tracking system (ATS) job board as one normalized JSON schema.
-    Supported ATS: Greenhouse, Lever, Ashby, SmartRecruiters, Workable and Recruitee. The API reads each
+    Supported ATS: Greenhouse, Lever, Ashby, SmartRecruiters and Recruitee. Workable is in the code but answers
+    Cloudflare Workers traffic with error 1015, so the hosted API returns 503 ats_unavailable for it. The API reads each
     vendor's official public job-board endpoint live (no scraping, no logins, no proxies) and caches boards for about 10 minutes.
 
     The LatentLark team
@@ -15,8 +16,8 @@ info:
     name: MIT
     url: https://opensource.org/licenses/MIT
 servers:
-  - url: https://ats-jobs-api.example.workers.dev
-    description: Replace with the deployed Worker URL before importing into RapidAPI.
+  - url: https://ats-jobs-api.latentlark.workers.dev
+    description: Live Cloudflare Worker (Workers Free plan)
 security:
   - RapidAPIKey: []
 tags:
@@ -63,7 +64,10 @@ paths:
         - $ref: '#/components/parameters/sort'
       responses:
         '200':
-          description: Jobs page
+          description: Jobs page. Header X-ATS-Cache is "response" when served from the whole-response cache, "miss" otherwise.
+          headers:
+            X-ATS-Cache:
+              schema: { type: string, enum: [response, miss] }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/JobsResponse' }
@@ -71,6 +75,11 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '502': { $ref: '#/components/responses/UpstreamError' }
+        '503':
+          description: ATS not available on this host (Workable) or the request ran out of upstream calls
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '504': { $ref: '#/components/responses/UpstreamTimeout' }
   /jobs/batch:
     post:
@@ -407,7 +416,7 @@ components:
         status: { type: integer }
         code:
           type: string
-          enum: [missing_parameter, invalid_parameter, invalid_json, invalid_body, too_many_companies, ats_required, duplicate, board_not_found, not_found, method_not_allowed, forbidden, unsupported_media_type, payload_too_large, upstream_error, upstream_bad_response, upstream_timeout, subrequest_budget_exhausted, batch_deadline, internal_error]
+          enum: [missing_parameter, invalid_parameter, invalid_json, invalid_body, too_many_companies, ats_required, duplicate, board_not_found, not_found, method_not_allowed, forbidden, unsupported_media_type, payload_too_large, upstream_error, upstream_bad_response, upstream_timeout, subrequest_budget_exhausted, ats_unavailable, batch_deadline, internal_error]
         message: { type: string }
     Error:
       type: object

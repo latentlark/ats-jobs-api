@@ -1,10 +1,11 @@
 """Edge-case and error-path checks against a running worker. usage: python3 test/edge.py [base]"""
 import json, sys, time, urllib.request, urllib.error, urllib.parse
+UA = 'ats-jobs-api-test/1.0 (curl compatible)'
 BASE = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:8787'
 
 def call(method, path, body=None, headers=None, raw_body=None):
     data = raw_body if raw_body is not None else (json.dumps(body).encode() if body is not None else None)
-    h = {'Content-Type': 'application/json'} if data is not None else {}
+    h = {'Content-Type': 'application/json', 'User-Agent': UA} if data is not None else {'User-Agent': UA}
     h.update(headers or {})
     req = urllib.request.Request(BASE + path, data=data, headers=h, method=method)
     t = time.time()
@@ -25,7 +26,7 @@ cases = [
   ('unknown Lever board', 'GET', '/jobs?ats=lever&company=nonexistentxyz123', None, 404),
   ('unknown Ashby board', 'GET', '/jobs?ats=ashby&company=nonexistentxyz123', None, 404),
   ('unknown SR company', 'GET', '/jobs?ats=smartrecruiters&company=nonexistentxyz123', None, 404),
-  ('unknown Workable', 'GET', '/jobs?ats=workable&company=nonexistentxyz123', None, 404),
+  ('Workable disabled on Workers', 'GET', '/jobs?ats=workable&company=nonexistentxyz123', None, 503),
   ('unknown Recruitee (DNS)', 'GET', '/jobs?ats=recruitee&company=nonexistentxyz123', None, 404),
   ('unicode slug', 'GET', '/jobs?ats=greenhouse&company=' + Q('münchen-jobs'), None, 400),
   ('unicode q (Ü, accents)', 'GET', '/jobs?ats=recruitee&company=duravermeer&q=' + Q('Omgevingsmanager') + '&limit=5', None, 200),

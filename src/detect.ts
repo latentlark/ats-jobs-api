@@ -95,7 +95,7 @@ async function probe(ats: Ats, slug: string, budget: Budget): Promise<number | n
  * Detect the ATS for a careers URL, an "ats:slug" value, or a company slug/name.
  * Order: prefix, URL pattern (no network), careers page HTML (1 request), then parallel probes.
  */
-export async function detect(input: { company?: string | null; url?: string | null }, budget: Budget): Promise<{ matches: Detection[]; tried: string[] }> {
+export async function detect(input: { company?: string | null; url?: string | null }, budget: Budget, atsList: Ats[] = ATS_LIST): Promise<{ matches: Detection[]; tried: string[] }> {
   const tried: string[] = [];
   const raw = (input.url ?? input.company ?? '').trim();
   if (!raw) throw new HttpError(400, 'missing_parameter', 'Pass company (slug or name) or url.');
@@ -135,7 +135,7 @@ export async function detect(input: { company?: string | null; url?: string | nu
   if (!slugs.length) throw new HttpError(400, 'invalid_parameter', 'Could not derive a board slug from the input.');
   const jobs: Promise<Detection | null>[] = [];
   for (const slug of slugs) {
-    for (const ats of ATS_LIST) {
+    for (const ats of atsList) {
       if (budget.left < 2) break;
       tried.push(`${ats}:${slug}`);
       jobs.push(probe(ats, slug, budget).then((n) => (n === null ? null : { ats, company: slug, source: 'probe' as const, openJobs: n })));

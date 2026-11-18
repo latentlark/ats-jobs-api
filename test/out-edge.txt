@@ -1,47 +1,47 @@
-PASS 400 63ms 124B  missing company: missing_parameter: company is required (board slug, ats:slug or job board URL).
-PASS 400 7ms 124B  empty company: missing_parameter: company is required (board slug, ats:slug or job board URL).
-PASS 400 4ms 147B  bad ats: invalid_parameter: ats must be one of: greenhouse, lever, ashby, smartrecruiters, workable, recruitee.
-PASS 404 754ms 174B  unknown GH board: board_not_found: No public greenhouse job board found for "nonexistentxyz123".
-PASS 404 1905ms 164B  unknown Lever board: board_not_found: No public lever job board found for "nonexistentxyz123".
-PASS 404 102ms 164B  unknown Ashby board: board_not_found: No public ashby job board found for "nonexistentxyz123".
-PASS 404 422ms 347B  unknown SR company: board_not_found: No public smartrecruiters job board found for "nonexistentxyz123". SmartRecruiters returns
-PASS 404 121ms 170B  unknown Workable: board_not_found: No public workable job board found for "nonexistentxyz123".
-PASS 404 580ms 172B  unknown Recruitee (DNS): board_not_found: No public recruitee job board found for "nonexistentxyz123".
-PASS 400 7ms 189B  unicode slug: invalid_parameter: company must be a board slug like "stripe" (letters, digits, dot, dash, underscore), an at
-PASS 200 1585ms 3076B  unicode q (Ü, accents): returned=1 matched=1 warn=[]
-PASS 200 926ms 34127B  accent-insensitive q: returned=12 matched=12 warn=[]
-PASS 200 49ms 326B  emoji q: returned=0 matched=0 warn=[]
-PASS 400 6ms 189B  path traversal slug: invalid_parameter: company must be a board slug like "stripe" (letters, digits, dot, dash, underscore), an at
-PASS 200 10ms 275851B  limit huge: returned=500 matched=792 warn=['limit was capped at 500.']
-PASS 400 5ms 83B  limit 0: invalid_parameter: limit must be >= 1.
-PASS 400 4ms 89B  limit not int: invalid_parameter: limit must be an integer.
-PASS 400 5ms 84B  negative offset: invalid_parameter: offset must be >= 0.
-PASS 200 5ms 333B  offset past end: returned=0 matched=792 warn=[]
-PASS 200 5ms 327B  filter 0 matches: returned=0 matched=0 warn=[]
-PASS 200 4ms 67280B  remote=true: returned=115 matched=115 warn=[]
-PASS 400 5ms 93B  remote bad: invalid_parameter: remote must be true or false.
-PASS 400 4ms 103B  description bad: invalid_parameter: description must be none, text or html.
-PASS 200 3472ms 15836B  description html: returned=2 matched=792 warn=[]
-PASS 200 16ms 17175B  descMaxLen huge: returned=3 matched=306 warn=['descriptionMaxLength was capped at 20000.']
-PASS 200 300ms 39056B  location+department: returned=53 matched=53 warn=[]
-PASS 200 5ms 6165B  employmentType: returned=8 matched=8 warn=[]
-PASS 200 2483ms 318089B  postedWithinDays: returned=500 matched=567 warn=['This board has 5121 jobs; the first 2000 were read. Use q, or narrow filters, to search the rest.']
-PASS 200 6ms 3445B  sort posted_desc: returned=5 matched=306 warn=[]
-PASS 200 4434ms 2138B  ats:slug form: returned=3 matched=901 warn=[]
-PASS 200 6ms 2151B  board URL form: returned=3 matched=306 warn=[]
-PASS 400 6ms 110B  ats mismatch: invalid_parameter: ats does not match the ats: prefix in company.
-PASS 200 1495ms 2709B  auto-detect slug: returned=3 matched=181 warn=['Several ATS matched (ashby:ramp 181 jobs, greenhouse:ramp 1 jobs, workable:ramp 0 jobs); using the largest, ashby. Pass ats= to choose.']
-PASS 200 488ms 12839B  SR descriptions small page: returned=5 matched=2000 warn=['This board has 5121 jobs; the first 2000 were read. Use q, or narrow filters, to search the rest.']
-PASS 200 911ms 13811B  SR server-side q: returned=21 matched=21 warn=[]
-PASS 200 4ms 216B  detect url careers page: matches=[('ashby', 'openai', 'url_pattern')] req=0
-PASS 200 737ms 359B  detect slug probe: matches=[('greenhouse', 'databricks', 'probe')] req=6
-PASS 200 154ms 236B  detect domain: matches=[('ashby', 'notion', 'page_html')] req=1
-PASS 404 525ms 277B  detect nothing: matches=[] req=6
-PASS 400 6ms 99B  detect missing: missing_parameter: Pass company (slug or name) or url.
-PASS 400 5ms 97B  detect private ip: invalid_parameter: url must be a public http(s) URL.
-PASS 404 4ms 79B  unknown route: not_found: Unknown endpoint /nope.
-PASS 405 4ms 122B  wrong method: method_not_allowed: Use GET /jobs, or POST /jobs/batch for several companies.
-PASS 400 5ms 90B  batch not json: invalid_json: Request body is not valid JSON.
-PASS 400 4ms 100B  batch empty: missing_parameter: companies must be a non-empty array.
-PASS 400 4ms 124B  batch 21: too_many_companies: companies can hold at most 20 entries per request.
-PASS 200 5ms 3908B  batch mixed bad: [["ok", null, 5], ["error", "duplicate", null], ["error", "ats_required", null], ["error", "invalid_parameter", null], ["error", "board_not_found", null]]
+PASS 400 83ms 124B  missing company: missing_parameter: company is required (board slug, ats:slug or job board URL).
+PASS 400 105ms 124B  empty company: missing_parameter: company is required (board slug, ats:slug or job board URL).
+PASS 400 120ms 147B  bad ats: invalid_parameter: ats must be one of: greenhouse, lever, ashby, smartrecruiters, workable, recruitee.
+PASS 404 226ms 174B  unknown GH board: board_not_found: No public greenhouse job board found for "nonexistentxyz123".
+PASS 404 933ms 164B  unknown Lever board: board_not_found: No public lever job board found for "nonexistentxyz123".
+PASS 404 143ms 164B  unknown Ashby board: board_not_found: No public ashby job board found for "nonexistentxyz123".
+PASS 404 412ms 347B  unknown SR company: board_not_found: No public smartrecruiters job board found for "nonexistentxyz123". SmartRecruiters returns
+FAIL 503 123ms 165B  unknown Workable: ats_unavailable: workable blocks requests from this host right now, so it is not available on this API.
+PASS 404 471ms 172B  unknown Recruitee (DNS): board_not_found: No public recruitee job board found for "nonexistentxyz123".
+PASS 400 69ms 189B  unicode slug: invalid_parameter: company must be a board slug like "stripe" (letters, digits, dot, dash, underscore), an at
+PASS 200 107ms 3075B  unicode q (Ü, accents): returned=1 matched=1 warn=[]
+PASS 200 1315ms 34128B  accent-insensitive q: returned=12 matched=12 warn=[]
+PASS 200 145ms 326B  emoji q: returned=0 matched=0 warn=[]
+PASS 400 101ms 189B  path traversal slug: invalid_parameter: company must be a board slug like "stripe" (letters, digits, dot, dash, underscore), an at
+PASS 200 131ms 263792B  limit huge: returned=500 matched=792 warn=['limit was capped at 500.']
+PASS 400 84ms 83B  limit 0: invalid_parameter: limit must be >= 1.
+PASS 400 88ms 89B  limit not int: invalid_parameter: limit must be an integer.
+PASS 400 68ms 84B  negative offset: invalid_parameter: offset must be >= 0.
+PASS 200 131ms 332B  offset past end: returned=0 matched=792 warn=[]
+PASS 200 121ms 326B  filter 0 matches: returned=0 matched=0 warn=[]
+PASS 200 141ms 64565B  remote=true: returned=115 matched=115 warn=[]
+PASS 400 57ms 93B  remote bad: invalid_parameter: remote must be true or false.
+PASS 400 45ms 103B  description bad: invalid_parameter: description must be none, text or html.
+PASS 200 417ms 15835B  description html: returned=2 matched=792 warn=[]
+PASS 200 189ms 17175B  descMaxLen huge: returned=3 matched=306 warn=['descriptionMaxLength was capped at 20000.']
+PASS 200 163ms 39056B  location+department: returned=53 matched=53 warn=[]
+PASS 200 1156ms 6165B  employmentType: returned=8 matched=8 warn=[]
+PASS 200 98ms 318087B  postedWithinDays: returned=500 matched=567 warn=['This board has 5121 jobs; the first 2000 were read. Use q, or narrow filters, to search the rest.']
+PASS 200 101ms 3444B  sort posted_desc: returned=5 matched=306 warn=[]
+PASS 200 236ms 2137B  ats:slug form: returned=3 matched=901 warn=[]
+PASS 200 109ms 2150B  board URL form: returned=3 matched=306 warn=[]
+PASS 400 102ms 110B  ats mismatch: invalid_parameter: ats does not match the ats: prefix in company.
+PASS 200 506ms 2687B  auto-detect slug: returned=3 matched=181 warn=['Several ATS matched (ashby:ramp 181 jobs, greenhouse:ramp 1 jobs); using the largest, ashby. Pass ats= to choose.']
+PASS 200 638ms 12837B  SR descriptions small page: returned=5 matched=2000 warn=['This board has 5121 jobs; the first 2000 were read. Use q, or narrow filters, to search the rest.']
+PASS 200 955ms 13811B  SR server-side q: returned=21 matched=21 warn=[]
+PASS 200 60ms 216B  detect url careers page: matches=[('ashby', 'openai', 'url_pattern')] req=0
+PASS 200 413ms 337B  detect slug probe: matches=[('greenhouse', 'databricks', 'probe')] req=5
+PASS 200 261ms 236B  detect domain: matches=[('ashby', 'notion', 'page_html')] req=1
+PASS 404 442ms 248B  detect nothing: matches=[] req=5
+PASS 400 35ms 99B  detect missing: missing_parameter: Pass company (slug or name) or url.
+PASS 400 69ms 97B  detect private ip: invalid_parameter: url must be a public http(s) URL.
+PASS 404 104ms 79B  unknown route: not_found: Unknown endpoint /nope.
+PASS 405 82ms 122B  wrong method: method_not_allowed: Use GET /jobs, or POST /jobs/batch for several companies.
+PASS 400 89ms 90B  batch not json: invalid_json: Request body is not valid JSON.
+PASS 400 95ms 100B  batch empty: missing_parameter: companies must be a non-empty array.
+PASS 400 87ms 124B  batch 21: too_many_companies: companies can hold at most 20 entries per request.
+PASS 200 625ms 3796B  batch mixed bad: [["ok", null, 5], ["error", "duplicate", null], ["error", "ats_required", null], ["error", "invalid_parameter", null], ["error", "board_not_found", null]]

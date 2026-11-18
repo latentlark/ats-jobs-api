@@ -2,6 +2,8 @@
 
 Open jobs from a company's own applicant tracking system (ATS) as one clean JSON schema, served from a Cloudflare Worker.
 
+**Live:** https://ats-jobs-api.latentlark.workers.dev (try [`/health`](https://ats-jobs-api.latentlark.workers.dev/health) or [`/jobs?company=greenhouse:stripe&limit=5`](https://ats-jobs-api.latentlark.workers.dev/jobs?company=greenhouse:stripe&limit=5)). It runs on the Workers Free plan.
+
 Supported ATS (each verified live on 18 Nov 2026 with a 100+ job board):
 
 | ATS | Public endpoint used | Pagination | Salary | Example board |
@@ -10,8 +12,10 @@ Supported ATS (each verified live on 18 Nov 2026 with a 100+ job board):
 | Lever | `api.lever.co/v0/postings/{site}?mode=json` (EU host as fallback) | one response | when published | `palantir` (306) |
 | Ashby | `api.ashbyhq.com/posting-api/job-board/{name}?includeCompensation=true` | one response | often | `openai` (839) |
 | SmartRecruiters | `api.smartrecruiters.com/v1/companies/{id}/postings` | 100 per page, fetched in parallel | no | `BoschGroup` (5,121) |
-| Workable | `apply.workable.com/api/v1/widget/accounts/{account}` | one response | no | `creativechaos` (182) |
+| Workable (off on the hosted API) | `apply.workable.com/api/v1/widget/accounts/{account}` | one response | no | `creativechaos` (182) |
 | Recruitee | `{company}.recruitee.com/api/offers/` | one response | often | `vdkgroep` (707) |
+
+Workable works from a normal server but answers every request from Cloudflare Workers with Cloudflare error 1015 (rate limited), so the hosted API returns `503 ats_unavailable` for it. Set `ENABLE_WORKABLE = "true"` in `wrangler.toml` if you host the code somewhere Workable does not block.
 
 No scraping, no logins, no proxies and no API keys: these are the feeds the ATS vendors publish for career sites. Recruiter mailbox addresses that some feeds expose are never returned.
 
@@ -87,19 +91,38 @@ Every error is JSON: `{"error": {"status": 404, "code": "board_not_found", "mess
 | 404 | `board_not_found`, `not_found` |
 | 405, 413, 415 | wrong method, body over 64 KB, body not JSON |
 | 502 | `upstream_error`, `upstream_bad_response` |
-| 503 | `subrequest_budget_exhausted` |
+| 503 | `subrequest_budget_exhausted`, `ats_unavailable` (Workable on Workers) |
 | 504 | `upstream_timeout` |
 
 ## How it stays fast and inside Workers limits
 
 - Every upstream call has an 8 second timeout and one retry on 429, 5xx or a network error (EU fallback hosts: 4 seconds, no retry).
-- Boards are cached for 10 minutes (`CACHE_TTL_SECONDS`): an in-isolate LRU (32 MB) plus the Cache API. The Cache API only works on a custom domain; on `workers.dev` the in-isolate cache still works.
+- Three cache layers, 10 minutes each (`CACHE_TTL_SECONDS`): whole `GET /jobs` responses (Cache API, up to 5 minutes, about 1 ms CPU on a hit, header `X-ATS-Cache: response`), normalized boards (Cache API), and an in-isolate LRU (32 MB). The Cache API works on `workers.dev` (verified live).
 - Unknown boards are remembered for 5 minutes, so typos do not hammer the ATS.
 - Only the description data a request needs is kept, and HTML is converted to text only for the jobs returned, only up to the requested length, and memoized.
 - Every request counts its subrequests (fetches and Cache API calls share the Workers quota) and stays at 48 or fewer (Free plan limit: 50). This is why a batch is capped at 20 companies.
 - Batch concurrency is 6, which matches the Workers limit of 6 open connections per request. A batch stops starting new companies after 25 seconds.
 
-### Measured (18 Nov 2026, `wrangler dev`, live ATS)
+### Measured live on workers.dev (18 Nov 2026, Workers Free plan)
+
+CPU from `wrangler tail`. Latency from a client in Europe through the box network.
+
+| Company | ATS | Jobs on board | Returned | First read | CPU | Repeat | CPU | Size |
+|---|---|---|---|---|---|---|---|---|
+| stripe | Greenhouse | 792 | 500 | 1.08 s | 304 ms | 124 ms | 2 ms | 786 KB |
+| databricks | Greenhouse | 901 | 500 | 0.84 s | 358 ms | 100 ms | 1 ms | 830 KB |
+| palantir | Lever | 306 | 306 | 1.25 s | 136 ms | 77 ms | 1 ms | 498 KB |
+| openai | Ashby | 840 | 500 | 0.30 s | 166 ms | 123 ms | 1 ms | 866 KB |
+| ramp | Ashby | 181 | 181 | 0.24 s | 76 ms | 118 ms | 1 ms | 321 KB |
+| BoschGroup | SmartRecruiters | 5,121 | 500 (2,000 read) | 2.48 s | 142 ms | 62 ms | 1 ms | 334 KB |
+| vdkgroep | Recruitee | 707 | 500 | 0.93 s | 116 ms | 131 ms | 2 ms | 842 KB |
+| duravermeer | Recruitee | 381 | 381 | 1.34 s | 216 ms | 148 ms | 1 ms | 656 KB |
+
+All with `limit=500&description=text&descriptionMaxLength=1000`. Batch of 20 real companies (5 ATS), 100 jobs each: 1,916 jobs, 1.5 s, 1.25 MB, 44 subrequests. 14 parallel requests: all 200, 1.16 s wall.
+
+Free plan CPU: the 10 ms limit is soft per isolate. Across 424 live `/jobs` and `/jobs/batch` requests (including 70 cold reads of 14 large boards), 247 used more than 10 ms CPU and the maximum was 980 ms (a 20-company batch), yet **none was stopped** (outcome `ok` for all, no error 1102). Cold single-board reads use 20 to 360 ms; cached responses use 1 to 3 ms.
+
+### Measured locally (18 Nov 2026, `wrangler dev`, live ATS)
 
 | Company | ATS | Jobs on board | Returned | Cold latency | Warm latency | Response size |
 |---|---|---|---|---|---|---|
@@ -116,7 +139,7 @@ Every error is JSON: `{"error": {"status": 404, "code": "board_not_found", "mess
 
 All with `limit=500&description=text&descriptionMaxLength=1000`. Batch of 20 real companies (all six ATS), 100 jobs each: 1,916 jobs, 4.4 s cold, 29 ms warm, 1.2 MB, 47 subrequests.
 
-CPU time (from `npm run bench`, the same code in V8 with recorded upstream bodies): cache hits cost 3 to 7 ms. A cold read of a very large board costs 20 to 280 ms, mostly `JSON.parse` of a 5 to 15 MB upstream body. The Workers Free plan allows 10 ms CPU per request with some burst tolerance, so production traffic on large boards needs Workers Paid (30 s CPU by default).
+CPU time (from `npm run bench`, the same code in V8 with recorded upstream bodies): cache hits cost 3 to 7 ms. A cold read of a very large board costs 20 to 280 ms, mostly `JSON.parse` of a 5 to 15 MB upstream body. Cloudflare can stop a Worker that goes over 10 ms consistently on the Free plan; Workers Paid (30 s CPU by default) removes that risk.
 
 ## Run, test, deploy
 
@@ -137,7 +160,7 @@ Optional: `npx wrangler secret put PROXY_SECRET` makes the Worker require RapidA
 
 - SmartRecruiters ids are case-sensitive, and its API returns an empty list (not 404) for unknown ids, so an id with zero open jobs is reported as `board_not_found`.
 - SmartRecruiters descriptions need one call per job, so `/jobs` adds them only when 20 or fewer jobs are returned.
-- Workday and Personio are not included in this version.
+- Workday and Personio are not included in this version. Workable is off on the hosted API (see above).
 - The data belongs to the companies that publish it. Use it in line with each board's terms.
 
 The LatentLark team

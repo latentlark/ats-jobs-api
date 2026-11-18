@@ -13,7 +13,7 @@ let memBytes = 0;
 /** level: 0 = no descriptions stored, 1 = text-ready descriptions, 2 = HTML kept. */
 export function cacheKey(ats: Ats, token: string, level: 0 | 1 | 2, maxPages: number, q?: string): string {
   const t = ats === 'smartrecruiters' ? token : token.toLowerCase();
-  return `https://cache.ats-jobs-api.internal/v2/${ats}/${encodeURIComponent(t)}?l=${level}&p=${maxPages}&q=${encodeURIComponent((q ?? '').toLowerCase())}`;
+  return `https://cache.ats-jobs-api.internal/v4/${ats}/${encodeURIComponent(t)}?l=${level}&p=${maxPages}&q=${encodeURIComponent((q ?? '').toLowerCase())}`;
 }
 
 export function memGet(key: string): Board | null {

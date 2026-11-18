@@ -7,6 +7,18 @@ import { Budget, HttpError, errorResponse, htmlToText, htmlToTextCapped, jsonRes
 export interface Env {
   PROXY_SECRET?: string;
   CACHE_TTL_SECONDS?: string;
+  /** Workable rate-limits requests that come from Cloudflare Workers (error 1015), so it is off unless set to "true". */
+  ENABLE_WORKABLE?: string;
+}
+
+function enabledAts(env: Env): Ats[] {
+  return ATS_LIST.filter((a) => a !== 'workable' || env.ENABLE_WORKABLE === 'true');
+}
+
+function assertEnabled(ats: Ats, env: Env): void {
+  if (!enabledAts(env).includes(ats)) {
+    throw new HttpError(503, 'ats_unavailable', `${ats} blocks requests from this host right now, so it is not available on this API.`, { ats });
+  }
 }
 
 const VERSION = '1.0.0';
@@ -165,6 +177,7 @@ function shrink(board: Board, level: 0 | 1 | 2): Board {
 }
 
 async function loadBoard(ats: Ats, token: string, budget: Budget, env: Env, ctx: ExecutionContext, opts: { level: 0 | 1 | 2; maxPages: number; q?: string }): Promise<{ board: Board; cached: 'memory' | 'edge' | false }> {
+  assertEnabled(ats, env);
   const ttlRaw = Number(env.CACHE_TTL_SECONDS ?? 600);
   const ttl = Number.isFinite(ttlRaw) ? Math.max(0, Math.min(3600, Math.floor(ttlRaw))) : 600;
   const q = ats === 'smartrecruiters' ? opts.q : undefined;
@@ -201,9 +214,14 @@ async function loadBoard(ats: Ats, token: string, budget: Budget, env: Env, ctx:
   shrink(board, level);
   if (ttl > 0) {
     const key = cacheKey(ats, token, level, maxPages, q);
-    const put = edgePut(key, board, ttl, budget);
-    ctx.waitUntil(put.promise);
-    memPut(key, board, put.bytes, ttl);
+    if (level === 2) {
+      // HTML boards are the largest; serializing them for the Cache API costs more CPU than it saves.
+      memPut(key, board, board.jobs.reduce((n, j) => n + (j.descHtml?.length ?? 0) + (j.descPlain?.length ?? 0) + 600, 0), ttl);
+    } else {
+      const put = edgePut(key, board, ttl, budget);
+      ctx.waitUntil(put.promise);
+      memPut(key, board, put.bytes, ttl);
+    }
   }
   return { board, cached: false };
 }
@@ -321,19 +339,52 @@ function select(board: Board, f: Filters, o: OutputOpts): { matched: RawJob[]; p
 }
 
 // ---------------- handlers ----------------
-async function handleJobs(url: URL, env: Env, ctx: ExecutionContext): Promise<Response> {
+/** Whole-response cache key: same query (params sorted) = same bytes, no JSON parsing on a hit. */
+function responseKey(url: URL): string {
+  const sp = [...url.searchParams.entries()].sort(([a, av], [b, bv]) => (a === b ? (av < bv ? -1 : 1) : a < b ? -1 : 1));
+  return `https://cache.ats-jobs-api.internal/r2${url.pathname}?${new URLSearchParams(sp).toString()}`;
+}
+
+async function handleJobsCached(url: URL, env: Env, ctx: ExecutionContext): Promise<Response> {
+  const ttl = Math.max(0, Math.min(3600, Math.floor(Number(env.CACHE_TTL_SECONDS ?? 600)) || 0));
+  if (ttl === 0) return handleJobs(url, env, ctx);
+  const key = responseKey(url);
+  try {
+    const hit = await caches.default.match(key);
+    if (hit) {
+      const h = new Headers(hit.headers);
+      h.set('X-ATS-Cache', 'response');
+      return new Response(hit.body, { status: 200, headers: h });
+    }
+  } catch {
+    /* cache unavailable: compute */
+  }
+  const res = await handleJobs(url, env, ctx, 1);
+  if (res.status === 200) {
+    const body = await res.arrayBuffer();
+    const headers = new Headers(res.headers);
+    const stored = new Headers(headers);
+    stored.set('Cache-Control', `public, max-age=${Math.min(ttl, 300)}`);
+    ctx.waitUntil(caches.default.put(key, new Response(body, { headers: stored })).catch(() => undefined));
+    headers.set('X-ATS-Cache', 'miss');
+    return new Response(body, { status: 200, headers });
+  }
+  return res;
+}
+
+async function handleJobs(url: URL, env: Env, ctx: ExecutionContext, usedSubrequests = 0): Promise<Response> {
   const t0 = Date.now();
   const sp = url.searchParams;
   const get = (k: string) => sp.get(k);
   const warnings: string[] = [];
   const f = parseFilters(get);
   const o = parseOutput(get, warnings);
-  const budget = new Budget(SUBREQUEST_LIMIT);
+  const budget = new Budget(SUBREQUEST_LIMIT - 1 - usedSubrequests); // 1 kept for the response-cache write
   let { ats, token } = resolveTarget(str(get('ats'), 'ats', 40), str(get('company'), 'company', 300) ?? str(get('url'), 'url', 2048));
   let detected = false;
   if (!ats) {
-    const d = await detect({ company: token }, budget);
-    if (!d.matches.length) throw new HttpError(404, 'board_not_found', `No public job board found for "${token}" on ${ATS_LIST.join(', ')}. Pass ats= or a job board URL.`, { company: token, tried: d.tried });
+    const d = await detect({ company: token }, budget, enabledAts(env));
+    if (!d.matches.length) throw new HttpError(404, 'board_not_found', `No public job board found for "${token}" on ${enabledAts(env).join(', ')}. Pass ats= or a job board URL.`, { company: token, tried: d.tried });
     ats = d.matches[0].ats;
     token = d.matches[0].company;
     detected = true;
@@ -507,12 +558,12 @@ async function handleBatch(req: Request, env: Env, ctx: ExecutionContext): Promi
   });
 }
 
-async function handleDetect(url: URL): Promise<Response> {
+async function handleDetect(url: URL, env: Env): Promise<Response> {
   const t0 = Date.now();
   const company = str(url.searchParams.get('company'), 'company', 300);
   const u = str(url.searchParams.get('url'), 'url', 2048);
   const budget = new Budget(SUBREQUEST_LIMIT);
-  const d = await detect({ company, url: u }, budget);
+  const d = await detect({ company, url: u }, budget, enabledAts(env));
   return jsonResponse(
     {
       input: u ?? company,
@@ -547,12 +598,12 @@ export default {
       }
       if (path === '/health') {
         if (req.method !== 'GET' && req.method !== 'HEAD') throw new HttpError(405, 'method_not_allowed', 'Use GET.');
-        return jsonResponse({ status: 'ok', version: VERSION, supportedAts: ATS_LIST, limits: { maxBatchCompanies: MAX_BATCH, maxLimit: MAX_LIMIT, maxDescriptionLength: MAX_DESC }, time: new Date().toISOString() });
+        return jsonResponse({ status: 'ok', version: VERSION, supportedAts: enabledAts(env), limits: { maxBatchCompanies: MAX_BATCH, maxLimit: MAX_LIMIT, maxDescriptionLength: MAX_DESC }, time: new Date().toISOString() });
       }
       checkProxySecret(req, env);
       if (path === '/jobs') {
         if (req.method !== 'GET') throw new HttpError(405, 'method_not_allowed', 'Use GET /jobs, or POST /jobs/batch for several companies.');
-        return await handleJobs(url, env, ctx);
+        return await handleJobsCached(url, env, ctx);
       }
       if (path === '/jobs/batch') {
         if (req.method !== 'POST') throw new HttpError(405, 'method_not_allowed', 'Use POST with a JSON body.');
@@ -560,7 +611,7 @@ export default {
       }
       if (path === '/detect') {
         if (req.method !== 'GET') throw new HttpError(405, 'method_not_allowed', 'Use GET.');
-        return await handleDetect(url);
+        return await handleDetect(url, env);
       }
       if (path === '/') {
         return jsonResponse({ name: 'ATS Jobs API', version: VERSION, endpoints: ['GET /jobs', 'POST /jobs/batch', 'GET /detect', 'GET /health'], docs: 'https://github.com/latentlark/ats-jobs-api' });

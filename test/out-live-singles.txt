@@ -1,0 +1,20 @@
+stripe	greenhouse	cold	200	792	500	1084	786	3	0	500	False	
+stripe	greenhouse	warm	200	792	500	124	786	3	0	500	False	
+databricks	greenhouse	cold	200	901	500	841	830	3	0	500	False	
+databricks	greenhouse	warm	200	901	500	100	830	3	0	500	False	
+palantir	lever	cold	200	306	306	1252	498	3	0	306	False	
+palantir	lever	warm	200	306	306	77	498	3	0	306	False	
+openai	ashby	cold	200	840	500	301	866	3	401	500	False	
+openai	ashby	warm	200	840	500	123	866	3	401	500	False	
+ramp	ashby	cold	200	181	181	239	321	3	175	181	False	
+ramp	ashby	warm	200	181	181	118	321	3	175	181	False	
+BoschGroup	smartrecruiters	cold	200	5121	500	2477	334	22	0	0	False	SmartRecruiters descriptions need one upstream call per job, so they are only ad
+BoschGroup	smartrecruiters	warm	200	5121	500	62	334	22	0	0	False	SmartRecruiters descriptions need one upstream call per job, so they are only ad
+creativechaos	workable	cold	503	None	0	94	0	None	0	0	None	
+creativechaos	workable	warm	503	None	0	57	0	None	0	0	None	
+innovativ-pharma-inc	workable	cold	503	None	0	117	0	None	0	0	None	
+innovativ-pharma-inc	workable	warm	503	None	0	93	0	None	0	0	None	
+vdkgroep	recruitee	cold	200	707	500	925	842	3	83	500	False	
+vdkgroep	recruitee	warm	200	707	500	131	842	3	83	500	False	
+duravermeer	recruitee	cold	200	381	381	1336	656	3	327	381	False	
+duravermeer	recruitee	warm	200	381	381	148	656	3	327	381	False	
