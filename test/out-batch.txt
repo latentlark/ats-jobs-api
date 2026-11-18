@@ -1,0 +1,75 @@
+
+== 15 companies, no desc, 100/company: HTTP 200 1121ms 750KB jobs=1123 ok=13 failed=2 upstream=30 warn=[]
+   ok greenhouse airbnb avail 202 matched 202 returned 100 edge 
+   ok greenhouse cloudflare avail 495 matched 495 returned 100 edge 
+   ok greenhouse datadog avail 383 matched 383 returned 100 edge 
+   ok greenhouse gitlab avail 250 matched 250 returned 100 edge 
+   ok lever spotify avail 90 matched 90 returned 90 edge 
+   error lever plaid avail None matched None returned None None board_not_found
+   ok ashby notion avail 167 matched 167 returned 100 False 
+   ok ashby linear avail 33 matched 33 returned 33 False 
+   ok ashby cohere avail 126 matched 126 returned 100 False 
+   error smartrecruiters Visa avail None matched None returned None None board_not_found
+   ok workable local-490 avail 106 matched 106 returned 100 False 
+   ok recruitee careyn avail 320 matched 320 returned 100 False 
+   ok greenhouse figma avail 143 matched 143 returned 100 edge 
+   ok lever zoox avail 242 matched 242 returned 100 edge 
+   ok ashby deel avail 0 matched 0 returned 0 False 
+
+== same 15, warm cache: HTTP 200 11ms 750KB jobs=1123 ok=13 failed=2 upstream=2 warn=[]
+   ok greenhouse airbnb avail 202 matched 202 returned 100 memory 
+   ok greenhouse cloudflare avail 495 matched 495 returned 100 memory 
+   ok greenhouse datadog avail 383 matched 383 returned 100 memory 
+   ok greenhouse gitlab avail 250 matched 250 returned 100 memory 
+   ok lever spotify avail 90 matched 90 returned 90 memory 
+   error lever plaid avail None matched None returned None None board_not_found
+   ok ashby notion avail 167 matched 167 returned 100 memory 
+   ok ashby linear avail 33 matched 33 returned 33 memory 
+   ok ashby cohere avail 126 matched 126 returned 100 memory 
+   error smartrecruiters Visa avail None matched None returned None None board_not_found
+   ok workable local-490 avail 106 matched 106 returned 100 memory 
+   ok recruitee careyn avail 320 matched 320 returned 100 memory 
+   ok greenhouse figma avail 143 matched 143 returned 100 memory 
+   ok lever zoox avail 242 matched 242 returned 100 memory 
+   ok ashby deel avail 0 matched 0 returned 0 memory 
+
+== 15 companies, text desc 500 chars, q=engineer: HTTP 200 818ms 972KB jobs=745 ok=13 failed=2 upstream=27 warn=['SmartRecruiters descriptions are not included in batch results. Use GET /jobs with limit <= 20.']
+   ok greenhouse airbnb avail 202 matched 55 returned 55 edge 
+   ok greenhouse cloudflare avail 495 matched 231 returned 231 edge 
+   ok greenhouse datadog avail 383 matched 83 returned 83 edge 
+   ok greenhouse gitlab avail 250 matched 78 returned 78 edge 
+   ok lever spotify avail 90 matched 32 returned 32 edge 
+   error lever plaid avail None matched None returned None None board_not_found
+   ok ashby notion avail 167 matched 34 returned 34 False 
+   ok ashby linear avail 33 matched 9 returned 9 False 
+   ok ashby cohere avail 126 matched 45 returned 45 False 
+   error smartrecruiters Visa avail None matched None returned None None board_not_found
+   ok workable local-490 avail 106 matched 0 returned 0 False 
+   ok recruitee careyn avail 320 matched 0 returned 0 False 
+   ok greenhouse figma avail 143 matched 40 returned 40 edge 
+   ok lever zoox avail 242 matched 138 returned 138 edge 
+   ok ashby deel avail 0 matched 0 returned 0 False 
+
+== 20 SmartRecruiters-heavy (budget): HTTP 200 1521ms 374KB jobs=603 ok=4 failed=16 upstream=46 warn=[]
+   ok smartrecruiters BoschGroup avail 5121 matched 200 returned 200 False 
+   error smartrecruiters Visa avail None matched None returned None None board_not_found
+   ok smartrecruiters McDonaldsCorporation avail 3 matched 3 returned 3 False 
+   ok smartrecruiters Ubisoft2 avail 305 matched 200 returned 200 False 
+   ok smartrecruiters LinkedIn3 avail 219 matched 200 returned 200 False 
+   error greenhouse x0notreal avail None matched None returned None None board_not_found
+   error greenhouse x1notreal avail None matched None returned None None board_not_found
+   error greenhouse x2notreal avail None matched None returned None None board_not_found
+   error greenhouse x3notreal avail None matched None returned None None board_not_found
+   error greenhouse x4notreal avail None matched None returned None None board_not_found
+   error greenhouse x5notreal avail None matched None returned None None board_not_found
+   error greenhouse x6notreal avail None matched None returned None None board_not_found
+   error greenhouse x7notreal avail None matched None returned None None board_not_found
+   error greenhouse x8notreal avail None matched None returned None None board_not_found
+   error greenhouse x9notreal avail None matched None returned None None board_not_found
+   error greenhouse x10notreal avail None matched None returned None None board_not_found
+   error greenhouse x11notreal avail None matched None returned None None board_not_found
+   error greenhouse x12notreal avail None matched None returned None None board_not_found
+   error greenhouse x13notreal avail None matched None returned None None board_not_found
+   error greenhouse x14notreal avail None matched None returned None None board_not_found
+
+== concurrency 14 parallel: wall 1094ms; codes [200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200]; slowest 1087ms

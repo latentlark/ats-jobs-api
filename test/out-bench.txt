@@ -1,0 +1,43 @@
+--- CPU per request, cache OFF (cold parse every time) ---
+warmup	200	10	cpu 127.9ms	wall 92ms	28KB	upstream 1
+gh stripe 500 no-desc	200	500	cpu 20.2ms	wall 16ms	258KB	upstream 1
+gh stripe 100 text	200	100	cpu 106.9ms	wall 92ms	158KB	upstream 1
+gh stripe 500 text	200	500	cpu 137.7ms	wall 125ms	783KB	upstream 1
+gh databricks 500 text	200	500	cpu 246.0ms	wall 227ms	828KB	upstream 1
+lever palantir 306 text	200	306	cpu 89.0ms	wall 84ms	496KB	upstream 1
+lever palantir 100 none	200	100	cpu 32.5ms	wall 30ms	60KB	upstream 1
+ashby openai 500 text	200	500	cpu 172.5ms	wall 170ms	863KB	upstream 1
+ashby openai 100 none	200	100	cpu 92.5ms	wall 88ms	71KB	upstream 1
+ashby ramp 181 text	200	181	cpu 30.4ms	wall 30ms	320KB	upstream 1
+sr bosch 2000 read, 500 out	200	500	cpu 93.2ms	wall 88ms	310KB	upstream 20
+workable creativechaos text	200	182	cpu 26.9ms	wall 22ms	288KB	upstream 1
+recruitee vdkgroep 500 text	200	500	cpu 183.7ms	wall 174ms	840KB	upstream 1
+gh stripe q=engineer searchDescription	200	100	cpu 182.0ms	wall 173ms	256KB	upstream 1
+--- same requests, cache ON, second call (memory hit) ---
+gh stripe 500 text [fill]	200	500	cpu 174.0ms	wall 164ms	783KB	upstream 1
+gh stripe 500 text [hit]	200	500	cpu 7.1ms	wall 7ms	783KB	upstream 0
+ashby openai 100 none [fill]	200	100	cpu 96.5ms	wall 94ms	71KB	upstream 1
+ashby openai 100 none [hit]	200	100	cpu 3.3ms	wall 1ms	71KB	upstream 0
+ashby openai 50 text (default) [fill]	200	50	cpu 178.6ms	wall 148ms	137KB	upstream 1
+ashby openai 50 text (default) [hit]	200	50	cpu 4.8ms	wall 2ms	137KB	upstream 0
+lever palantir 50 text (default) [fill]	200	50	cpu 70.4ms	wall 64ms	130KB	upstream 1
+lever palantir 50 text (default) [hit]	200	50	cpu 5.3ms	wall 2ms	130KB	upstream 0
+batch 8 big boards cold, no desc	200	700	cpu 325.6ms	wall 294ms	439KB	upstream 18
+batch 8 big boards [hit]	200	700	cpu 141.7ms	wall 135ms	442KB	upstream 15
+batch 8 big boards [hit2]	200	700	cpu 5.9ms	wall 5ms	442KB	upstream 0
+--- failure injection ---
+inject 429once	200	1	cpu 5.6ms	wall 1004ms	1KB	upstream 2
+   -> {"meta":{"ats":"ashby","boardToken":"flaky","company":"Flaky","detected":false,"totalAvailable":1,"totalFetched":1,"totalMatched":1,"returned":1,"offset":0,"lim (1009ms, upstream attempts 2)
+inject 500always	502	upstream_error	cpu 5.2ms	wall 402ms	0KB	upstream 2
+   -> {"error":{"status":502,"code":"upstream_error","message":"ashby returned HTTP 500.","ats":"ashby","upstreamStatus":500}} (410ms, upstream attempts 2)
+inject badjson	502	upstream_bad_response	cpu 0.7ms	wall 1ms	0KB	upstream 1
+   -> {"error":{"status":502,"code":"upstream_bad_response","message":"Upstream returned a response that is not valid JSON.","upstream":"api.ashbyhq.com"}} (7ms, upstream attempts 1)
+inject timeout	504	upstream_timeout	cpu 7.9ms	wall 16305ms	0KB	upstream 2
+   -> {"error":{"status":504,"code":"upstream_timeout","message":"Upstream request failed: timeout after 8000ms","upstream":"api.ashbyhq.com"}} (16310ms, upstream attempts 2)
+inject neterr	502	upstream_error	cpu 5.1ms	wall 302ms	0KB	upstream 2
+   -> {"error":{"status":502,"code":"upstream_error","message":"Upstream request failed: network down","upstream":"api.ashbyhq.com"}} (310ms, upstream attempts 2)
+--- proxy secret ---
+secret no header: 403
+secret wrong header: 403
+secret right header: 200
+secret /health without header: 200

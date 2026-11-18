@@ -1,0 +1,415 @@
+openapi: 3.0.3
+info:
+  title: ATS Jobs API
+  version: 1.0.0
+  description: |
+    Open jobs from a company's own applicant tracking system (ATS) job board as one normalized JSON schema.
+    Supported ATS: Greenhouse, Lever, Ashby, SmartRecruiters, Workable and Recruitee. The API reads each
+    vendor's official public job-board endpoint live (no scraping, no logins, no proxies) and caches boards for about 10 minutes.
+
+    The LatentLark team
+  contact:
+    name: The LatentLark team
+    url: https://github.com/latentlark/ats-jobs-api
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+  - url: https://ats-jobs-api.example.workers.dev
+    description: Replace with the deployed Worker URL before importing into RapidAPI.
+security:
+  - RapidAPIKey: []
+tags:
+  - name: Jobs
+    description: Read open jobs from ATS job boards
+  - name: Utility
+    description: ATS detection and health
+paths:
+  /jobs:
+    get:
+      tags: [Jobs]
+      operationId: getJobs
+      summary: Open jobs for one company
+      description: |
+        Returns the open jobs of one company's job board, filtered and paginated.
+        `company` accepts a board slug (`stripe`), an `ats:slug` value (`greenhouse:stripe`) or a job board URL
+        (`https://jobs.lever.co/palantir`). Without `ats` and without a URL or prefix, the API probes all supported ATS
+        and uses the board with the most open jobs (slower, see `meta.detected` and `meta.warnings`).
+      parameters:
+        - $ref: '#/components/parameters/ats'
+        - name: company
+          in: query
+          required: true
+          description: Board slug, ats:slug, or job board URL. SmartRecruiters ids are case-sensitive (BoschGroup).
+          schema: { type: string, maxLength: 300 }
+          example: stripe
+        - $ref: '#/components/parameters/q'
+        - $ref: '#/components/parameters/searchDescription'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/remote'
+        - $ref: '#/components/parameters/department'
+        - $ref: '#/components/parameters/employmentType'
+        - $ref: '#/components/parameters/postedWithinDays'
+        - name: limit
+          in: query
+          description: Jobs per page. Values above 500 are capped at 500 (see meta.warnings).
+          schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+        - name: offset
+          in: query
+          description: Jobs to skip. Use meta.nextOffset for the next page.
+          schema: { type: integer, minimum: 0, default: 0 }
+        - $ref: '#/components/parameters/description'
+        - $ref: '#/components/parameters/descriptionMaxLength'
+        - $ref: '#/components/parameters/sort'
+      responses:
+        '200':
+          description: Jobs page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JobsResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/UpstreamError' }
+        '504': { $ref: '#/components/responses/UpstreamTimeout' }
+  /jobs/batch:
+    post:
+      tags: [Jobs]
+      operationId: batchJobs
+      summary: Open jobs for up to 20 companies in one call
+      description: |
+        Fetches up to 20 boards in parallel (6 at a time) and applies the same filters to each.
+        Every entry needs an ATS: `"greenhouse:stripe"`, a board URL, or `{"ats":"greenhouse","company":"stripe"}`.
+        Failed entries do not fail the call; they come back with `status: error`. Duplicates are reported and skipped.
+        SmartRecruiters boards are read up to a few pages (100 jobs each) in batch mode; `truncated` tells you when more exist.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BatchRequest' }
+            example:
+              companies: ['greenhouse:stripe', 'https://jobs.lever.co/palantir', { ats: ashby, company: openai }, 'recruitee:vdkgroep']
+              q: engineer
+              remote: true
+              limitPerCompany: 100
+              description: none
+      responses:
+        '200':
+          description: Per-company results
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BatchResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413':
+          description: Body larger than 64 KB
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '415':
+          description: Content-Type is not application/json
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /detect:
+    get:
+      tags: [Utility]
+      operationId: detectAts
+      summary: Find which ATS a company uses
+      description: |
+        Pass a careers URL or a company slug/name. Order of checks: `ats:slug` prefix, known board URL patterns (no network),
+        the careers page HTML (one request, looks for embedded board links), then parallel probes of every supported ATS.
+        Matches are sorted by open job count.
+      parameters:
+        - name: company
+          in: query
+          description: Company slug or name, for example databricks. Use either company or url.
+          schema: { type: string, maxLength: 300 }
+        - name: url
+          in: query
+          description: Careers page or job board URL, for example https://www.notion.com/careers
+          schema: { type: string, maxLength: 2048 }
+      responses:
+        '200':
+          description: At least one board found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DetectResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404':
+          description: No board found (same body shape, found=false)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DetectResponse' }
+  /health:
+    get:
+      tags: [Utility]
+      operationId: health
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  version: { type: string, example: 1.0.0 }
+                  supportedAts: { type: array, items: { $ref: '#/components/schemas/Ats' } }
+                  limits:
+                    type: object
+                    properties:
+                      maxBatchCompanies: { type: integer, example: 20 }
+                      maxLimit: { type: integer, example: 500 }
+                      maxDescriptionLength: { type: integer, example: 20000 }
+                  time: { type: string, format: date-time }
+components:
+  securitySchemes:
+    RapidAPIKey:
+      type: apiKey
+      in: header
+      name: X-RapidAPI-Key
+      description: Added by RapidAPI. The Worker itself can optionally check X-RapidAPI-Proxy-Secret.
+  parameters:
+    ats:
+      name: ats
+      in: query
+      description: ATS of the board. Optional when company is a URL or ats:slug.
+      schema: { $ref: '#/components/schemas/Ats' }
+    q:
+      name: q
+      in: query
+      description: Keywords (all must match), searched in title, department and team. Accent and case insensitive.
+      schema: { type: string, maxLength: 200 }
+      example: senior engineer
+    searchDescription:
+      name: searchDescription
+      in: query
+      description: Also search descriptions with q (slower on large boards).
+      schema: { type: boolean, default: false }
+    location:
+      name: location
+      in: query
+      description: Substring match on location, all locations and country code.
+      schema: { type: string, maxLength: 200 }
+      example: london
+    remote:
+      name: remote
+      in: query
+      description: true returns only remote jobs, false only non-remote jobs.
+      schema: { type: boolean }
+    department:
+      name: department
+      in: query
+      description: Substring match on department or team.
+      schema: { type: string, maxLength: 200 }
+    employmentType:
+      name: employmentType
+      in: query
+      description: full_time, part_time, contract, temporary, internship, or a substring of the raw ATS value.
+      schema: { type: string, maxLength: 200 }
+    postedWithinDays:
+      name: postedWithinDays
+      in: query
+      description: Only jobs posted in the last N days. Jobs without a date are excluded when set.
+      schema: { type: integer, minimum: 1, maximum: 3650 }
+    description:
+      name: description
+      in: query
+      description: none (fastest), text (plain text, capped), or html (text plus raw HTML).
+      schema: { type: string, enum: [none, text, html], default: text }
+    descriptionMaxLength:
+      name: descriptionMaxLength
+      in: query
+      description: Max characters of description text. Longer text is cut at a word and ends with "...". Capped at 20000.
+      schema: { type: integer, minimum: 0, maximum: 20000, default: 2000 }
+    sort:
+      name: sort
+      in: query
+      description: none keeps the ATS order.
+      schema: { type: string, enum: [none, posted_desc, posted_asc], default: none }
+  responses:
+    BadRequest:
+      description: Invalid input
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { status: 400, code: invalid_parameter, message: 'limit must be an integer.' } }
+    Forbidden:
+      description: Missing or wrong X-RapidAPI-Proxy-Secret (only when the server has PROXY_SECRET set)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Board not found on that ATS
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { status: 404, code: board_not_found, message: 'No public greenhouse job board found for "acme".', ats: greenhouse, company: acme } }
+    UpstreamError:
+      description: The ATS failed or returned something unusable (after one retry)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    UpstreamTimeout:
+      description: The ATS did not answer within 8 seconds (after one retry)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Ats:
+      type: string
+      enum: [greenhouse, lever, ashby, smartrecruiters, workable, recruitee]
+    Salary:
+      type: object
+      nullable: true
+      description: Only when the ATS publishes pay. Ashby, Lever and Recruitee boards publish it most often.
+      properties:
+        min: { type: number, nullable: true, example: 211400 }
+        max: { type: number, nullable: true, example: 290600 }
+        currency: { type: string, nullable: true, example: USD }
+        interval: { type: string, nullable: true, example: 1 YEAR }
+        text: { type: string, nullable: true, example: '$211.4K - $290.6K - Offers Equity' }
+    Job:
+      type: object
+      required: [id, title, company, ats, boardToken, locations, remote]
+      properties:
+        id: { type: string, description: 'ATS job id, unique within a board' }
+        title: { type: string, nullable: true }
+        company: { type: string }
+        ats: { $ref: '#/components/schemas/Ats' }
+        boardToken: { type: string }
+        location: { type: string, nullable: true }
+        locations: { type: array, items: { type: string } }
+        country: { type: string, nullable: true }
+        remote: { type: boolean }
+        workplaceType: { type: string, nullable: true, enum: [remote, hybrid, onsite] }
+        department: { type: string, nullable: true }
+        team: { type: string, nullable: true }
+        employmentType: { type: string, nullable: true, description: Raw ATS value }
+        employmentTypeNormalized: { type: string, nullable: true, enum: [full_time, part_time, contract, temporary, internship] }
+        salary: { $ref: '#/components/schemas/Salary' }
+        postedAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: string, format: date-time, nullable: true }
+        url: { type: string, nullable: true }
+        applyUrl: { type: string, nullable: true }
+        description: { type: string, nullable: true, description: 'Plain text, present unless description=none' }
+        descriptionTruncated: { type: boolean }
+        descriptionHtml: { type: string, nullable: true, description: 'Only with description=html (stored up to 60,000 characters)' }
+    JobsMeta:
+      type: object
+      properties:
+        ats: { $ref: '#/components/schemas/Ats' }
+        boardToken: { type: string }
+        company: { type: string }
+        detected: { type: boolean, description: true when the ATS was auto-detected }
+        totalAvailable: { type: integer, description: Open jobs the ATS reports }
+        totalFetched: { type: integer, description: 'Jobs read (lower than totalAvailable only for very large SmartRecruiters boards)' }
+        totalMatched: { type: integer }
+        returned: { type: integer }
+        offset: { type: integer }
+        limit: { type: integer }
+        nextOffset: { type: integer, nullable: true }
+        truncated: { type: boolean }
+        cached: { oneOf: [{ type: boolean }, { type: string, enum: [memory, edge] }] }
+        fetchedAt: { type: string, format: date-time }
+        subrequests: { type: integer }
+        durationMs: { type: integer }
+        warnings: { type: array, items: { type: string } }
+    JobsResponse:
+      type: object
+      properties:
+        meta: { $ref: '#/components/schemas/JobsMeta' }
+        jobs: { type: array, items: { $ref: '#/components/schemas/Job' } }
+    BatchRequest:
+      type: object
+      required: [companies]
+      properties:
+        companies:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            oneOf:
+              - type: string
+                description: '"ats:slug" or a job board URL'
+              - type: object
+                required: [ats, company]
+                properties:
+                  ats: { $ref: '#/components/schemas/Ats' }
+                  company: { type: string }
+        q: { type: string }
+        searchDescription: { type: boolean }
+        location: { type: string }
+        remote: { type: boolean }
+        department: { type: string }
+        employmentType: { type: string }
+        postedWithinDays: { type: integer, minimum: 1 }
+        limitPerCompany: { type: integer, minimum: 1, maximum: 500, default: 100 }
+        description: { type: string, enum: [none, text, html], default: none }
+        descriptionMaxLength: { type: integer, minimum: 0, maximum: 20000, default: 2000 }
+        sort: { type: string, enum: [none, posted_desc, posted_asc] }
+    BatchResult:
+      type: object
+      properties:
+        input: {}
+        ats: { $ref: '#/components/schemas/Ats' }
+        boardToken: { type: string, nullable: true }
+        status: { type: string, enum: [ok, error] }
+        company: { type: string }
+        totalAvailable: { type: integer }
+        totalMatched: { type: integer }
+        returned: { type: integer }
+        truncated: { type: boolean }
+        cached: { oneOf: [{ type: boolean }, { type: string }] }
+        durationMs: { type: integer }
+        jobs: { type: array, items: { $ref: '#/components/schemas/Job' } }
+        error: { $ref: '#/components/schemas/ErrorBody' }
+    BatchResponse:
+      type: object
+      properties:
+        meta:
+          type: object
+          properties:
+            companies: { type: integer }
+            succeeded: { type: integer }
+            failed: { type: integer }
+            totalJobs: { type: integer }
+            limitPerCompany: { type: integer }
+            subrequests: { type: integer }
+            durationMs: { type: integer }
+            warnings: { type: array, items: { type: string } }
+        results: { type: array, items: { $ref: '#/components/schemas/BatchResult' } }
+    DetectResponse:
+      type: object
+      properties:
+        input: { type: string }
+        found: { type: boolean }
+        matches:
+          type: array
+          items:
+            type: object
+            properties:
+              ats: { $ref: '#/components/schemas/Ats' }
+              company: { type: string }
+              source: { type: string, enum: [url_pattern, page_html, probe] }
+              openJobs: { type: integer, description: 'Probe only; Lever counts stop at 100' }
+              jobsEndpoint: { type: string, example: '/jobs?ats=ashby&company=ramp' }
+        tried: { type: array, items: { type: string } }
+        subrequests: { type: integer }
+        durationMs: { type: integer }
+    ErrorBody:
+      type: object
+      additionalProperties: true
+      properties:
+        status: { type: integer }
+        code:
+          type: string
+          enum: [missing_parameter, invalid_parameter, invalid_json, invalid_body, too_many_companies, ats_required, duplicate, board_not_found, not_found, method_not_allowed, forbidden, unsupported_media_type, payload_too_large, upstream_error, upstream_bad_response, upstream_timeout, subrequest_budget_exhausted, batch_deadline, internal_error]
+        message: { type: string }
+    Error:
+      type: object
+      properties:
+        error: { $ref: '#/components/schemas/ErrorBody' }
